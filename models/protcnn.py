@@ -10,6 +10,7 @@ from keras.layers import Input, Lambda
 
 from utils import aa_letters
 from utils.metrics import aa_acc
+from utils.decoding import _decode_ar, _decode_nonar
 
 nchar = len(aa_letters)  # = 21
 
@@ -80,3 +81,24 @@ class BaseProtVAE:
         self.VAE.save_weights(file)
         print('Weights saved !')
         return self
+
+    def prior_sample(self, n_samples=1, mean=0, stddev=1,
+                     remove_gaps=False, batch_size=5000):
+        if n_samples > batch_size:
+            x = []
+            total = 0
+            while total< n_samples:
+                this_batch = min(batch_size, n_samples - total)
+                z_sample = mean + stddev * np.random.randn(this_batch, self.latent_dim)
+                x += self.decode(z_sample, remove_gaps=remove_gaps)
+                total += this_batch
+        else:
+            z_sample = mean + stddev * np.random.randn(n_samples, self.latent_dim)
+            x = self.decode(z_sample, remove_gaps=remove_gaps)
+        return x
+
+    def decode(self, z, remove_gaps=False, sample_func=None):
+        if self.autoregressive:
+            return _decode_ar(self.G, z, remove_gaps=remove_gaps, sample_func=sample_func)
+        else:
+            return _decode_nonar(self.G, z, remove_gaps=remove_gaps)

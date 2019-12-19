@@ -5,7 +5,7 @@ from models.decoders import recurrent_sequence_decoder, fc_decoder
 
 
 class MSAVAE(BaseProtVAE):
-  def __init__(self, latent_dim=10, original_dim=504,
+  def __init__(self, latent_dim=10, original_dim=360,
                alphabet=aa_letters, activation='relu', encoder_hidden=[256,256],
                encoder_dropout=[0.,0.], decoder_hidden=[256,256],
                decoder_dropout=[0.,0.], n_conditions=0.):
