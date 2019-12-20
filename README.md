@@ -4,7 +4,9 @@ This code provides implementations of variational autoencoder models designed to
 
 ### Dependencies
 
-The code requires Python 3.4 or greater. Variational autoencoder models were implemented in keras using the tensorflow backend (tensorflow 1.0.0). Full python dependencies are listed in requirements.txt. Use of a GPU is recommended for training models on unaligned data.
+The code requires Python 3. Variational autoencoder models were implemented in keras (2.1.2) using the tensorflow backend (tensorflow 1.0.0). Full python dependencies are listed in requirements.txt.
+
+Individual models were trained on a single Tesla K80 GPU with cuda 8.0.0, cudnn v5 and Python 3.6.0.
 
 ### Installation
 
