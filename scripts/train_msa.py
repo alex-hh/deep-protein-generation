@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+import argparse
 import numpy as np
 from keras.callbacks import CSVLogger, ModelCheckpoint
 
@@ -25,17 +26,12 @@ train_gen = one_hot_generator(msa_seqs, padding=None)
 val_gen = one_hot_generator(val_msa_seqs, padding=None)
 
 # Define model
-print('Loading model')
+print('Building model')
 model = MSAVAE(original_dim=360, latent_dim=10, encoder_hidden=[256,256],
                decoder_hidden=[256,256])
 
 # (Optionally) define callbacks
 callbacks=[CSVLogger('output/logs/msavae.csv')]
-
-# callbacks += [LuxaReconsMismatches(luxa_seq, model, conditions=luxa_conds, n_samples=10),
-#               LastBestCheckpoint('generative_models/weights/{}_luxabest.h5'.format(settings['expt_name']),
-#                                  monitor='luxa_errors_mean', save_best_only=True, mode='min',
-#                                  verbose=1)]
 
 if save_all_epochs:
     callbacks.append(ModelCheckpoint('output/weights/msavae'+'.{epoch:02d}-{luxa_errors_mean:.2f}.hdf5',
@@ -50,3 +46,6 @@ model.VAE.fit_generator(generator=train_gen,
                         validation_data=val_gen,
                         validation_steps=len(val_msa_seqs) // batch_size,
                         callbacks=callbacks)
+
+if not save_all_epochs:
+  model.save_weights('output/weights/msavae.h5')
