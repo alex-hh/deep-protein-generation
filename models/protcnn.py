@@ -1,5 +1,8 @@
 import tensorflow as tf
+
+from functools import partial
 import numpy as np
+
 
 from keras import backend as K
 from keras import objectives, losses
@@ -8,9 +11,10 @@ from keras.callbacks import TensorBoard, Callback
 from keras.models import Model
 from keras.layers import Input, Lambda
 
-from utils import aa_letters
+from utils import aa_letters, luxa_seq
 from utils.metrics import aa_acc
-from utils.decoding import _decode_ar, _decode_nonar
+from utils.data_loaders import right_pad, to_one_hot
+from utils.decoding import _decode_ar, _decode_nonar, batch_temp_sample
 
 nchar = len(aa_letters)  # = 21
 
@@ -20,20 +24,31 @@ def sampler(latent_dim, epsilon_std=1):
 
     return Lambda(_sampling, output_shape=(latent_dim,))
 
+def luxa_batch_conds(n_samples, solubility_level):
+    target_conds = [0,0,0]
+    target_conds[solubility_level] = 1
+    target_conds = np.repeat(np.array(target_conds).reshape((1,3)), n_samples, axis=0)
+    return target_conds
+
 
 class BaseProtVAE:
-    # Child classes must define a self.E, self.G, self.S
+    # Child classes must define a self.E, self.G
     def __init__(self, n_conditions=0, autoregressive=True,
                  lr=0.001, clipnorm=0., clipvalue=0., metrics=['accuracy', aa_acc],
-                 condition_encoder=True):
+                 condition_encoder=True, latent_dim=50, original_dim=504):
 
         self.n_conditions = n_conditions
         self.condition_encoder = condition_encoder
         self.autoregressive = autoregressive
-        
+        self.latent_dim = latent_dim
+        self.original_dim = original_dim
+
+        self.S = sampler(latent_dim, epsilon_std=1.)
+
         prot = self.E.inputs[0]
         encoder_inp = [prot]
         vae_inp = [prot]
+        
         if n_conditions>0:
             conditions = Input((n_conditions,))
             vae_inp.append(conditions)
@@ -97,8 +112,30 @@ class BaseProtVAE:
             x = self.decode(z_sample, remove_gaps=remove_gaps)
         return x
 
-    def decode(self, z, remove_gaps=False, sample_func=None):
+    def decode(self, z, remove_gaps=False, sample_func=None, conditions=None):
         if self.autoregressive:
-            return _decode_ar(self.G, z, remove_gaps=remove_gaps, sample_func=sample_func)
+            return _decode_ar(self.G, z, remove_gaps=remove_gaps, sample_func=sample_func,
+                              conditions=conditions)
         else:
-            return _decode_nonar(self.G, z, remove_gaps=remove_gaps)
+            return _decode_nonar(self.G, z, remove_gaps=remove_gaps, conditions=conditions)
+
+    def generate_variants_luxA(self, num_samples, posterior_var_scale=1., temperature=0.,
+                               solubility_level=None):
+
+        luxa_oh = to_one_hot(right_pad([luxa_seq], self.E.input_shape[1]))
+        luxa_oh = np.repeat(luxa_oh, num_samples, axis=0)
+        orig_conds = np.repeat(np.array([1,0,0]).reshape((1,3)), num_samples, axis=0)
+        inputs = luxa_oh if solubility_level is None else [luxa_oh, orig_conds]
+
+        luxa_zmean, luxa_zvar, luxa_z = self.stochastic_E.predict(inputs)
+        print(luxa_z.shape)
+
+        if posterior_var_scale != 1.:
+            luxa_z = np.sqrt(posterior_scale*luxa_zvar)*np.random.randn(*luxa_zmean.shape) + luxa_zmean
+
+        sample_func = None
+        if temperature > 0:
+            sample_func = partial(batch_temp_sample, temperature=temperature)
+        target_conds = None if solubility_level is None else luxa_batch_conds(num_samples, solubility_level)
+        return self.decode(luxa_z, remove_gaps=True, sample_func=sample_func,
+                           conditions=target_conds)
