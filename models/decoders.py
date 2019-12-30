@@ -55,9 +55,9 @@ def upsampler(latent_vector, low_res_dim, min_deconv_dim=21,
 def recurrent_sequence_decoder(latent_dim, seqlen, ncell=512,
                                alphabet_size=21, project_x=True,
                                upsample=False, min_deconv_dim=42,
-                               input_dropout=None, cond_embed_dim=None, transform_z=False,
-                               intermediate_dim=63, max_filters=336,
-                               n_conditions=0, cond_concat_each_timestep=False):
+                               input_dropout=None, intermediate_dim=63,
+                               max_filters=336, n_conditions=0,
+                               cond_concat_each_timestep=False):
 
     latent_vector = Input((latent_dim,))
     latent_v = latent_vector
