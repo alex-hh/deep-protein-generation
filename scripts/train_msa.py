@@ -27,8 +27,7 @@ val_gen = one_hot_generator(val_msa_seqs, padding=None)
 
 # Define model
 print('Building model')
-model = MSAVAE(original_dim=360, latent_dim=10, encoder_hidden=[256,256],
-               decoder_hidden=[256,256])
+model = MSAVAE(original_dim=360, latent_dim=10)
 
 # (Optionally) define callbacks
 callbacks=[CSVLogger('output/logs/msavae.csv')]

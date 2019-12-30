@@ -5,15 +5,13 @@ from keras.models import Model
 from keras.layers import Input, Concatenate, Reshape, Dense, Add,Lambda,\
                          Activation, Flatten, Dropout, BatchNormalization,\
                          Flatten, RepeatVector, ZeroPadding1D,\
-                         GRU, LSTM, Conv1D, PReLU
-from utils import aa_letters
+                         GRU, LSTM, Conv1D
 from utils.layers import _activation, Deconv1D
 
 
-nchar = len(aa_letters)  # = 21
 
 def fc_decoder(latent_dim, seqlen, decoder_hidden=[250], decoder_dropout=[0.],
-               alphabet_size=nchar, n_conditions=0, activation='relu'):
+               alphabet_size=21, n_conditions=0, activation='relu'):
     latent_vector = Input((latent_dim,))
     latent_v = latent_vector
     if n_conditions > 0:
@@ -55,11 +53,11 @@ def upsampler(latent_vector, low_res_dim, min_deconv_dim=21,
     return h
 
 def recurrent_sequence_decoder(latent_dim, seqlen, ncell=512,
-                               alphabet_size=nchar, project_x=True,
+                               alphabet_size=21, project_x=True,
                                upsample=False, min_deconv_dim=42,
-                               input_dropout=None, batch_size=32,
-                               cond_embed_dim=None, transform_z=False,
-                               intermediate_dim=63, max_filters=336):
+                               input_dropout=None, cond_embed_dim=None, transform_z=False,
+                               intermediate_dim=63, max_filters=336,
+                               n_conditions=0, cond_concat_each_timestep=False):
 
     latent_vector = Input((latent_dim,))
     latent_v = latent_vector
@@ -72,19 +70,31 @@ def recurrent_sequence_decoder(latent_dim, seqlen, ncell=512,
         input_x = Dropout(input_dropout, noise_shape=(None, seqlen, 1))(input_x)
     if project_x:
         input_x = Conv1D(alphabet_size, 1, activation=None, name='decoder_x_embed')(input_x)
+
+    if n_conditions > 0:
+        cond_inp = Input((n_conditions,))
+        conditions = cond_inp
+        latent_v = Concatenate()([latent_v, conditions])
     
     rnn = GRU(ncell, return_sequences=True)
     if upsample:
         z_seq = upsampler(latent_v, intermediate_dim, min_deconv_dim=min_deconv_dim,
                           n_deconv=3, activation='prelu', max_filters=max_filters)
+        if cond_concat_each_timestep:
+            cond_seq = RepeatVector(seqlen)(conditions)
+            z_seq = Concatenate(axis=-1)([z_seq, cond_seq])
     else:
         z_seq = RepeatVector(seqlen)(latent_v)
+    
     xz_seq = Concatenate(axis=-1)([z_seq, input_x])
     rnn_out = rnn(xz_seq)
     
     processed_x = Conv1D(alphabet_size, 1, activation=None, use_bias=True)(rnn_out)
-    output = Activation("softmax")(processed_x)
+    output = Activation('softmax')(processed_x)
     
-    G = Model([latent_vector, prot_oh], output)
+    if n_conditions > 0:
+        G = Model([latent_vector, cond_inp, prot_oh], output)
+    else:
+        G = Model([latent_vector, prot_oh], output)
     return G
     
