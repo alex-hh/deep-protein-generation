@@ -2,7 +2,7 @@ backcall==0.1.0
 cycler==0.10.0
 decorator==4.3.0
 h5py==2.8.0
-ipython==6.4.0
+ipython==7.16.3
 ipython-genutils==0.2.0
 jedi==0.12.1
 Keras==2.1.2
